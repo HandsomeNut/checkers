@@ -106,7 +106,7 @@ def makemove(event):
     global markedID
     # Getting exact field coords
     x = floor(event.x/100)*100
-    y = floor(event.y/100)*100
+    y = floor(event.y/100)*10
     if preMark is None:
         # Happens when first clicked
         if tokenOnField(x, y) and markedID[1] !="p2":
