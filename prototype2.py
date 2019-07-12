@@ -1,6 +1,7 @@
 import tkinter as tk
 from math import floor
 from tkinter import messagebox as msg
+import copy
 
 
 # Main window creation
@@ -63,16 +64,16 @@ for y in range(0, 301, 100):
             tokens[id] = Token(0, [floor((x + 10) / 100), floor((y + 10) / 100)], [x + 10, y + 10])
 
 # Creating tokens; Player 2
-x = 300
-y = 300
-id = checkersBoard.create_oval(x + 10, y + 10, x + 90, y + 90, fill="white")
-tokens[id] = Token(1, [floor((x + 10) / 100), floor((y + 10) / 100)], [x + 10, y + 10])
-
-x = 500
-y = 500
-id = checkersBoard.create_oval(x + 10, y + 10, x + 90, y + 90, fill="white")
-tokens[id] = Token(1, [floor((x + 10) / 100), floor((y + 10) / 100)], [x + 10, y + 10])
-
+for y in range(500, 701, 100):
+    for x in range(0, 701, 100):
+        # even numbered row
+        if (y == 500 or (y/100)%2 != 0) and (x/100 % 2) == 1:
+            id = checkersBoard.create_oval(x + 10, y + 10, x + 90, y + 90, fill="white")
+            tokens[id] = Token(1, [floor((x + 10) / 100), floor((y+10)/100)], [x+10, y+10])
+        # even numbered row
+        elif y == 600 and (x/100 % 2) == 0:
+            id = checkersBoard.create_oval(x + 10, y + 10, x + 90, y + 90, fill="white")
+            tokens[id] = Token(1, [floor((x + 10) / 100), floor((y + 10) / 100)], [x + 10, y + 10])
 
 print(tokens)
 
@@ -91,9 +92,8 @@ def tokenOnField(x, y):
     for piece in checkersBoard.find_overlapping(x, y, x+100, y+100):
         for id in tokens:
             if piece == id:
-                if preMark is None and markedID is None:
+                if preMark is None:
                     markedID = id
-                    print(markedID)
                 return True
 
     return False
@@ -108,10 +108,10 @@ def isPremark(x, y, mark):
 
 # Movement rules for tokens
 def legalMove(x, y, id):
-    print("mark.x", tokens[id].coordGui[0])
-    print("mark.y", tokens[id].coordGui[1])
-    print("x", x)
-    print("y", y)
+    # print("mark.x", tokens[id].coordGui[0])
+    # print("mark.y", tokens[id].coordGui[1])
+    # print("x", x)
+    # print("y", y)
     # Rules for player 1
     if turn == 0:
         # token is inbetween 2 fields to jump over forward
@@ -153,7 +153,7 @@ def canjump(x, y, id):
         if tokenOnField(dx,dy) and isEnemyToken(dx, dy):
             for piece in checkersBoard.find_overlapping(dx, dy, dx + 100, dy + 100):
                 for id in tokens:
-                    if piece == id:
+                    if piece == id and preMark is not None:
                         # setting token for being deleted
                         tokens[id].jumped = True
             print("Jop, hier isn Stein!")
@@ -201,41 +201,55 @@ def switchTurn():
         turn = 0
         print("Spieler 1 ist am Zug!")
 
+
 # can the present token jump over more tokens
 def noMoreJumps():
     return True
 
-# def turnPossible():
-#     global tokens
-#     for id in tokens:
-#         if tokens[id].player == turn:
-#             x2 = tokens[id].coordGui[0] - 10
-#             y2 = tokens[id].coordGui[1] - 10
-#             if not tokenOnField(x2 + 100, y2 + 100) or isEnemyToken(x2 + 100, y2 + 100):
-#                 tokens[id].moveable = True
-#                 print(id, x2, y2, "YEAH" ,tokens[id].coordGui[0],tokens[id].coordGui[1])
-#             elif not tokenOnField(x2 - 100, y2 + 100) or isEnemyToken(x2 - 100, y2 + 100):
-#                 tokens[id].moveable = True
-#                 print(id, x2, y2, "YEAH!!!")
-#             else:
-#                 print(id, x2, y2, "Nein!")
-#                 tokens[id].moveable = False
+def turnPossible():
+    global tokens
+
+    if turn == 0:
+        nmove = 100
+        jmove = 200
+
+    else:
+        nmove = -100
+        jmove = -200
+    for id in tokens:
+        if tokens[id].player == turn:
+            x = tokens[id].coordGui[0] - 10
+            y = tokens[id].coordGui[1] - 10
+            # False if at the right side an no way to jump
+            if x > 699 and (tokenOnField(x - 100, y + nmove) and not canjump(x - 200, y + jmove, id)):
+                tokens[id].moveable = False
+            # False if at the left side and no way to jump over enemy
+            elif x < 100 and (tokenOnField(x + 100, y + nmove) and not canjump(x + 200, y + jmove, id)):
+                tokens[id].moveable = False
+            # True if field to the right is free or enemy token to jump over
+            elif not tokenOnField(x + 100, y + nmove) or isEnemyToken(x + 100, y + nmove) \
+                    and (not x > 599 and canjump(x + 200, y + jmove, id)):
+                tokens[id].moveable = True
+            # Same for the left side
+            elif not tokenOnField(x - 100, y + nmove) or isEnemyToken(x - 100, y + nmove) \
+                    and (not x < 200 and canjump(x - 200, y + jmove, id)):
+                tokens[id].moveable = True
+            else:
+                tokens[id].moveable = False
 
 def winCondition():
+    print(turn)
+    # turncheck when changing Turns
+    turnPossible()
     for id in tokens:
-        if tokens[id].player == enemyPlayer():
-            return
-        if tokens[id].moveable:
-            return
-    msg.showinfo("Gewonnen", " Spieler 1 hat das Spiel gewonnen")
+        if tokens[id].player == turn:
+            if tokens[id].moveable:
+                return
+    msg.showinfo("Gewonnen", "Spieler " + str(enemyPlayer() + 1) + " hat das Spiel gewonnen")
 
 # Moving and removing playing pieces
 def makemove(event):
-    global preMark
-    global markedID
-    global tokens
-
-    # turnPossible()
+    global preMark, tokens, markedID
 
     # Getting exact field coords
     x = floor(event.x/100)*100
@@ -243,15 +257,18 @@ def makemove(event):
     # Happens when first clicked
     if preMark is None:
         # drawing marker and selecting token
-        if tokenOnField(x, y) and tokens[markedID].player != enemyPlayer(): #and tokens[markedID].moveable:
+        if tokenOnField(x, y) and tokens[markedID].player != enemyPlayer() and tokens[markedID].moveable:
             preMark = checkersBoard.create_rectangle(x + 2, y + 2, x + 98, y + 98, width=4, outline="yellow")
         else:
-            msg.showwarning("Achtung!", "Kein legaler Spielstein auf diesem Feld!")
+            msg.showwarning("Achtung!", "Zug nicht möglich!")
             markedID = None
 
     # Happens when clicking the second time
     elif isPremark(x, y,preMark):
-        msg.showwarning("Achtung!", "Feld ist bereits gewählt!")
+        deselectField = msg.askyesno("Achtung!", "Stein ist bereits gewählt!\nStein abwählen?")
+        if deselectField:
+            checkersBoard.delete(preMark)
+            preMark = None
 
     # If token is man
     elif tokens[markedID].king == False:
@@ -264,16 +281,17 @@ def makemove(event):
             checkersBoard.coords(markedID, x + 10, y + 10, x + 90, y + 90)
             tokens[markedID].coordGui = [x + 10, y + 10]
             tokens[markedID].coordBoard = [floor(x/100), floor(y/100)]
-            if tokens[markedID].coordGui[1] > 700:
+            if (turn == 0 and tokens[markedID].coordGui[1] > 700) or (turn == 1 and tokens[markedID].coordGui[1] < 100):
                 msg.showinfo("Dame!", "Der Spielstein ist zur Dame geworden")
                 tokens[markedID].king = True
-            # if moved or jumped and no more jumps available
+            # if moved or jumped and no more jumps possible
             if noMoreJumps():
                 checkersBoard.delete(preMark)
                 markedID = None
                 preMark = None
                 switchTurn()
-
+                boardAnalysis()
+                winCondition()
 
     # If token is king
     else:
@@ -286,18 +304,24 @@ def makemove(event):
             checkersBoard.coords(markedID, x + 10, y + 10, x + 90, y + 90)
             tokens[markedID].coordGui = [x + 10, y + 10]
             tokens[markedID].coordBoard = [floor(x / 100), floor(y / 100)]
-            markedID = None
-            preMark = None
-            checkersBoard.delete(new)
+            # if moved or jumped and no more jumps possible
+            if noMoreJumps():
+                checkersBoard.delete(preMark)
+                markedID = None
+                preMark = None
+                switchTurn()
+                boardAnalysis()
+                winCondition()
+
     # checking for win and analysing and finally updating the board in GUI and Array
-    winCondition()
-    boardAnalysis()
     print(markedID)
     print(preMark)
 
 # if left clicking on Canvas
 checkersBoard.bind("<Button-1>", makemove)
 
+# Initial Boardcheck
+turnPossible()
 
 # start main eventloop
 root.mainloop()
