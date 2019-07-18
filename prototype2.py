@@ -16,7 +16,7 @@ checkersBoard.grid(column=0, row=0)
 class Token():
     def __init__(self, player, board, gui):
         self.player = player
-        self.king = False
+        self.king = True
         self.dead = False
         self.jumped = False
         self.coordBoard = board
@@ -50,8 +50,8 @@ preMark = None
 markedID = None
 field = newField()
 turn = 0    # 0 => Player 1; 1 => Player 2
-dx = 0
-dy = 0
+fieldX = 0
+fieldY = 0
 
 # Creating tokens; Player 1
 for y in range(0, 301, 100):
@@ -111,14 +111,29 @@ def isPremark(x, y, mark):
 # Movement rules for tokens
 def legalMove(x, y, id):
     # Rules for player 1
-    if turn == 0:
+    if tokens[id].king:
+        dx, dy = getDelta(x, y, id)
+        print(dx, dy)
+        # If Jump possible
+        if dx/dy == 1 and canJump(x, y, id) and not tokens[id].jumped:
+            makeJump(id)
+            return True
+        # If can make regular move
+        elif dx/dy == 1 and not tokens[id].jumped:
+            return True
+        # If already jump and can jumpAgain only if next to token
+        elif dx/dy == 1 and canJump(x, y, id) and tokens[id].coordGui[1] + 201 <= y >= tokens[id].coordGui[1] - 211:
+            return True
+
+        print("shit happened")
+    elif turn == 0:
         # token is inbetween 2 fields to jump over forward
         if y > tokens[id].coordGui[1] + 100 and canJump(x, y, id):
             makeJump(id)
             return True
         # can only move diagonal towards the enemy
         elif tokens[id].coordGui[1] + 100 == y + 10 and (tokens[id].coordGui[0] - 100 == x + 10 \
-                or x + 10 == tokens[id].coordGui[0] + 100) and not tokens[id].king and not tokens[id].jumped:
+                or x + 10 == tokens[id].coordGui[0] + 100) and not tokens[id].jumped:
             return True
     # Rules for player 2/ same as player 1 in reverse
     else:
@@ -126,37 +141,53 @@ def legalMove(x, y, id):
             makeJump(id)
             return True
         elif tokens[id].coordGui[1] - 100 == y + 10 and (tokens[id].coordGui[0] - 100 == x + 10 \
-                or x + 10 == tokens[id].coordGui[0] + 100) and not tokens[id].king:
+                or x + 10 == tokens[id].coordGui[0] + 100) and not tokens[id].jumped:
             return True
 
 def canJump(x, y, id):
-    global dx, dy
     # is the target field free?
     if not tokenOnField(x,y):
-        # getting the coordinates for the field between
-        if tokens[id].coordGui[0] > x:
-            dx = tokens[id].coordGui[0] - x
-            dx = floor(((dx/2) + x)/100)*100
-        else:
-            dx = x - tokens[id].coordGui[0]
-            dx = floor(((dx/2) + tokens[id].coordGui[0]) / 100) * 100
-
-        if tokens[id].coordGui[1] > y:
-            dy = tokens[id].coordGui[1] - y
-            dy = floor(((dy/2) + y)/100)*100
-        else:
-            dy = y - tokens[id].coordGui[1]
-            dy = floor(((dy/2) + tokens[id].coordGui[1]) / 100) * 100
+        # getting the coordinates for the field in between
+        prevX, prevY = previousField(x, y, id)
         # checking if a token is on the field inbetween and if its an enemy
-        if tokenOnField(dx,dy) and isEnemyToken(dx, dy):
-            print("Jop, hier isn Stein!", dx, dy)
+        if tokenOnField(prevX,prevY) and isEnemyToken(prevX, prevY):
+            print("Jop, hier isn Stein!", prevX, prevY)
             return True
     return False
+
+def previousField(x, y, id):
+    global fieldX, fieldY
+    # Coordinates of the previous field
+    if tokens[id].coordGui[0] > x:
+        fieldX = x + 100
+    else:
+        fieldX = x - 100
+
+    if tokens[id].coordGui[1] > y:
+        fieldY = y + 100
+    else:
+        fieldY = y - 100
+
+    return fieldX, fieldY
+
+def getDelta(x, y, id):
+    # neutral Delta move values for x and y
+        if tokens[id].coordGui[0] > x:
+            dx = floor(tokens[id].coordGui[0]/100)*100 - x
+        else:
+            dx = x - floor(tokens[id].coordGui[0]/100)*100
+
+        if tokens[id].coordGui[1] > y:
+            dy = floor(tokens[id].coordGui[1]/100)*100 - y
+        else:
+            dy = y - floor(tokens[id].coordGui[1]/100)*100
+
+        return dx, dy
 
 # Jump over a token
 def makeJump(markedID):
     global tokens
-    for piece in checkersBoard.find_overlapping(dx, dy, dx + 100, dy + 100):
+    for piece in checkersBoard.find_overlapping(fieldX, fieldY, fieldX + 100, fieldY + 100):
         for id in tokens:
             if piece == id and preMark is not None:
                 # setting token for being deleted
@@ -334,7 +365,11 @@ def makemove(event):
             msg.showwarning("Achtung", "Kann Stein nicht auf dieses Feld bewegen")
         elif tokens[markedID].jumped:
             moveMade(x, y)
-            pass
+            if not jumpAgain(markedID):
+                tokens[markedID].jumped = False
+                switchTurn()
+            else:
+                msg.showinfo("Weiterspringen!", "Spring weiter!")
         else:
             # resets times clicked # if moved
             moveMade(x, y)
